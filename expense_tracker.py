@@ -1,7 +1,7 @@
-from expense import Expense
+import os
 import calendar
 import datetime
-
+from expense import Expense  # Ensure expense.py is in the same directory
 
 def main():
     print(f"🎯 Running Expense Tracker!")
@@ -21,7 +21,13 @@ def main():
 def get_user_expense():
     print(f"🎯 Getting User Expense")
     expense_name = input("Enter expense name: ")
-    expense_amount = float(input("Enter expense amount: "))
+    while True:
+        try:
+            expense_amount = float(input("Enter expense amount: "))
+            break
+        except ValueError:
+            print("Invalid amount. Please enter a numeric value.")
+    
     expense_categories = [
         "🍔 Food",
         "🏠 Home",
@@ -36,38 +42,55 @@ def get_user_expense():
             print(f"  {i + 1}. {category_name}")
 
         value_range = f"[1 - {len(expense_categories)}]"
-        selected_index = int(input(f"Enter a category number {value_range}: ")) - 1
-
-        if selected_index in range(len(expense_categories)):
-            selected_category = expense_categories[selected_index]
-            new_expense = Expense(
-                name=expense_name, category=selected_category, amount=expense_amount
-            )
-            return new_expense
-        else:
-            print("Invalid category. Please try again!")
+        try:
+            selected_index = int(input(f"Enter a category number {value_range}: ")) - 1
+            if selected_index in range(len(expense_categories)):
+                selected_category = expense_categories[selected_index]
+                new_expense = Expense(
+                    name=expense_name, category=selected_category, amount=expense_amount
+                )
+                return new_expense
+            else:
+                print("Invalid category. Please try again!")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
 
 
 def save_expense_to_file(expense: Expense, expense_file_path):
     print(f"🎯 Saving User Expense: {expense} to {expense_file_path}")
-    with open(expense_file_path, "a", encoding="utf-8") as f:
-        f.write(f"{expense.name},{expense.amount},{expense.category}\n")
-    
+    try:
+        with open(expense_file_path, "a", encoding="utf-8") as f:
+            f.write(f"{expense.name},{expense.amount},{expense.category}\n")
+    except IOError as e:
+        print(f"Error saving expense to file: {e}")
 
 
 def summarize_expenses(expense_file_path, budget):
     print(f"🎯 Summarizing User Expense")
-    expenses: list[Expense] = []
-    with open(expense_file_path, "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            expense_name, expense_amount, expense_category = line.strip().split(",")
-            line_expense = Expense(
-                name=expense_name,
-                amount=float(expense_amount),
-                category=expense_category,
-            )
-            expenses.append(line_expense)
+    expenses = []
+
+    if not os.path.exists(expense_file_path):
+        print("No expenses recorded yet.")
+        return
+
+    try:
+        with open(expense_file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            for line in lines:
+                if line.strip():  # Ensure line is not empty
+                    expense_name, expense_amount, expense_category = line.strip().split(",")
+                    line_expense = Expense(
+                        name=expense_name,
+                        amount=float(expense_amount),
+                        category=expense_category,
+                    )
+                    expenses.append(line_expense)
+    except IOError as e:
+        print(f"Error reading expenses from file: {e}")
+        return
+    except ValueError as e:
+        print(f"Error processing line: {e}")
+        return
 
     amount_by_category = {}
     for expense in expenses:
@@ -81,7 +104,7 @@ def summarize_expenses(expense_file_path, budget):
     for key, amount in amount_by_category.items():
         print(f"  {key}: ${amount:.2f}")
 
-    total_spent = sum([x.amount for x in expenses])
+    total_spent = sum(x.amount for x in expenses)
     print(f"💵 Total Spent: ${total_spent:.2f}")
 
     remaining_budget = budget - total_spent
@@ -91,7 +114,7 @@ def summarize_expenses(expense_file_path, budget):
     days_in_month = calendar.monthrange(now.year, now.month)[1]
     remaining_days = days_in_month - now.day
 
-    daily_budget = remaining_budget / remaining_days
+    daily_budget = remaining_budget / remaining_days if remaining_days > 0 else remaining_budget
     print(green(f"👉 Budget Per Day: ${daily_budget:.2f}"))
 
 
